@@ -65,6 +65,7 @@ node _sim2.js         # 当天已玩过的存档也能安全进练手
 ```
 index.html              全部游戏代码（HTML + CSS + JS 单文件，约 55 KB）
 serve.js                零依赖静态服务器，给手机调试用
+push.cmd                一键推到 GitHub（push.cmd 用户名/仓库名）
 extra-words.js          可选：构建期生成的外部词库（只扩「同类词」，不会成为答案）
 tools/
   build-extra.js        从 sources/*.txt 或 --fetch 的 URL 列表生成 extra-words.js
@@ -87,6 +88,10 @@ sources/README.md       词库来源与格式说明
 - [ ] 搬进 Devvit（红迪应用框架），手机真机 playtest
 - [ ] 人群数据层：今天多少人参与、大家最常想到的词是哪个
 - [ ] 提交与 Demo 视频
+
+## 仓库
+
+代码在 https://github.com/June-tech-yyy/Guess-Game 。改完推送：`push.cmd June-tech-yyy/Guess-Game`，或者 `git add -A && git commit -m "..." && git push`。
 
 ## 状态
 
