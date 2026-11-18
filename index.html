@@ -1,0 +1,938 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>同频 · Same Frequency</title>
+<style>
+  :root{
+    --bg:#0a0f16; --panel:#111b26; --line:#1e2f40; --txt:#e8eef5; --dim:#7f95a8;
+    --acc:#5b8cff; --ok:#3ecf8e; --warm:#f5b544; --bad:#e5484d; --cold:#2a3a4a;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  body{margin:0; background:radial-gradient(800px 460px at 50% -8%, #16283c, var(--bg));
+    color:var(--txt); font-family:ui-sans-serif,system-ui,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    min-height:100vh; display:flex; justify-content:center; padding:16px}
+  .wrap{width:100%; max-width:420px; position:relative}
+  header{display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:14px}
+  .brand{font-weight:800; font-size:19px; letter-spacing:.5px}
+  .brand small{color:var(--dim); font-weight:600; font-size:11px; margin-left:5px}
+  .streak{font-size:12px; color:var(--dim)}
+  .streak b{color:var(--warm); font-size:15px}
+  .streak{margin-left:auto}
+  .ghost{background:transparent; border:1px solid var(--line); color:var(--dim); font:inherit;
+    font-size:12px; padding:5px 10px; border-radius:8px; cursor:pointer; white-space:nowrap}
+  .ghost:active{background:var(--panel); color:var(--txt)}
+
+  .prompt{background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:16px; margin-bottom:12px}
+  .prompt .q{font-size:11.5px; color:var(--dim); letter-spacing:.5px; margin-bottom:6px}
+  .prompt .t{font-size:19px; font-weight:800; line-height:1.35}
+  .prompt .meta{font-size:11px; color:var(--dim); margin-top:8px}
+
+  .rows{display:flex; flex-direction:column; gap:8px; margin-bottom:12px}
+  .row{display:flex; align-items:center; gap:10px; background:var(--panel); border:1px solid var(--line);
+    border-radius:11px; padding:9px 11px; animation:pop .18s ease-out}
+  @keyframes pop{from{transform:translateY(6px); opacity:0} to{transform:none; opacity:1}}
+  .row .w{font-size:16px; font-weight:800; flex:1}
+  .row .tags{font-size:10.5px; color:var(--dim); margin-top:2px}
+  .row .mk{min-width:26px; height:26px; padding:0 8px; border-radius:7px; display:flex; align-items:center;
+    justify-content:center; font-size:11.5px; font-weight:800; flex:none; white-space:nowrap}
+  .mk.g{background:var(--ok); color:#04241a}
+  .mk.y{background:var(--warm); color:#26180a}
+  .mk.b{background:var(--cold); color:#8aa0b4}
+  .mk.k{background:#2f6fb5; color:#eaf3ff}
+  .row.answered{border-color:#2c4155}
+
+  .inputRow{display:flex; gap:8px; margin-bottom:10px}
+  .inputRow input{flex:1; background:var(--panel); border:1px solid var(--line); border-radius:11px;
+    padding:12px 14px; color:var(--txt); font-size:15.5px; outline:none; font-family:inherit}
+  .inputRow input:focus{border-color:var(--acc)}
+  .inputRow button{padding:0 20px; border-radius:11px; border:none; background:var(--acc); color:#fff;
+    font-size:15px; font-weight:800; cursor:pointer}
+  .inputRow button:disabled{opacity:.4; cursor:default}
+
+  .hint{font-size:11.5px; color:var(--dim); text-align:center; margin-bottom:14px; min-height:16px}
+  .hint b{color:var(--warm)}
+
+  .result{display:none; background:var(--panel); border:1px solid var(--line); border-radius:14px; padding:14px; margin-bottom:12px}
+  .result.show{display:block; animation:pop .2s ease-out}
+  .result h2{margin:0 0 8px; font-size:16px}
+  .result .big{font-size:22px; font-weight:800; margin-bottom:10px}
+  .result .big.win{color:var(--ok)} .result .big.lose{color:var(--bad)}
+  .result p{margin:0 0 10px; font-size:12.5px; color:var(--dim); line-height:1.6}
+  .btns{display:flex; gap:8px}
+  .btns button{flex:1; padding:10px; border-radius:10px; border:1px solid var(--line); background:#17283a;
+    color:var(--txt); font-size:12.5px; font-weight:700; cursor:pointer}
+  .btns button.primary{background:var(--acc); border-color:var(--acc)}
+
+  .foot{font-size:10.5px; color:#4e657a; text-align:center; line-height:1.7}
+  .toast{position:fixed; left:50%; bottom:26px; transform:translate(-50%,10px); background:#e8eef5; color:#0a0f16;
+    padding:9px 16px; border-radius:20px; font-size:12.5px; font-weight:700; opacity:0; pointer-events:none; transition:.2s}
+  .toast.show{opacity:1; transform:translate(-50%,0)}
+
+  /* 惩罚小游戏 */
+  .overlay{position:fixed; inset:0; background:rgba(6,10,16,.96); display:none; align-items:center;
+    justify-content:center; padding:18px; z-index:50}
+  .overlay.show{display:flex}
+  .ov-card{width:100%; max-width:380px; background:#0e1721; border:1px solid var(--line); border-radius:16px;
+    padding:18px; text-align:center}
+  .ov-kicker{font-size:10.5px; letter-spacing:2px; color:var(--dim); margin-bottom:6px}
+  .ov-card h3{font-size:19px; margin:0 0 6px}
+  #stage{min-height:120px; display:flex; align-items:center; justify-content:center;
+    flex-direction:column; width:100%}
+  .ov-card p{font-size:12.5px; color:var(--dim); margin:0 0 14px; line-height:1.6; min-height:34px}
+  .timerBar{width:100%; height:5px; background:#1e2f40; border-radius:3px; margin-top:14px; overflow:hidden}
+  .timerBar i{display:block; height:100%; width:100%; background:var(--acc); transition:width .1s linear}
+
+  .pgBig{width:150px; height:150px; border-radius:50%; border:3px solid var(--acc); background:#16283c;
+    color:var(--txt); font-size:22px; font-weight:800; cursor:pointer; transition:transform .06s; user-select:none; touch-action:none}
+  .pgBig:active{transform:scale(.94)}
+  .pgNum{margin-top:12px; font-size:13px; color:var(--dim)}
+  .pgNum b{color:var(--txt); font-size:20px}
+  .pgProg{width:100%; height:7px; background:#1e2f40; border-radius:4px; margin-top:14px; overflow:hidden}
+  .pgProg i{display:block; height:100%; width:0; background:var(--ok); transition:width .1s linear}
+  .pgRange{width:100%; accent-color:var(--acc); margin:18px 0 6px}
+  .pgDrag{position:relative; width:100%; height:190px; background:#101c27; border:1px solid var(--line);
+    border-radius:12px; touch-action:none; overflow:hidden}
+  .pgTarget{position:absolute; right:18px; bottom:18px; width:78px; height:78px; border:2px dashed #4a6b8a;
+    border-radius:50%; pointer-events:none}
+  .pgDot{position:absolute; left:18px; top:18px; width:28px; height:28px; border-radius:50%;
+    background:var(--acc); cursor:grab; touch-action:none; box-shadow:0 0 0 6px rgba(91,140,255,.18)}
+  .pgPad{width:100%; height:190px; background:#101c27; border:1px solid var(--line); border-radius:12px;
+    display:flex; align-items:center; justify-content:center; touch-action:none; position:relative; overflow:hidden}
+  .pgHint{font-size:12px; color:var(--dim); pointer-events:none}
+  .pgGrid{display:grid; gap:8px; margin:4px 0; width:100%}
+  .pgCell{aspect-ratio:1/1; display:flex; align-items:center; justify-content:center; font-size:24px;
+    background:#16283c; border:1px solid var(--line); border-radius:10px; cursor:pointer}
+  .pgCell:active{transform:scale(.94)}
+  .pgRow{display:flex; gap:8px; justify-content:center; margin-top:10px; flex-wrap:wrap; width:100%}
+  .pgOpt{padding:12px 16px; border-radius:11px; border:1px solid var(--line); background:#16283c;
+    color:var(--txt); font-size:15px; font-weight:700; cursor:pointer; min-width:74px}
+  .pgOpt:active{transform:scale(.95)}
+  .pgWord{font-size:26px; font-weight:800; letter-spacing:2px; margin:10px 0}
+  .pgNote{font-size:11.5px; color:var(--warn); min-height:16px; margin-top:10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">同频<small>Same Frequency</small></div>
+    <div class="streak">连胜 <b id="streak">0</b> 天</div>
+    <button class="ghost" id="practiceBtn">练手</button>
+  </header>
+
+  <div class="prompt">
+    <div class="q" id="qLabel">今天的问题是</div>
+    <div class="t" id="qText">—</div>
+    <div class="meta" id="qMeta"></div>
+  </div>
+
+  <div class="rows" id="rows"></div>
+
+  <div class="inputRow">
+    <input id="guess" placeholder="随便说个词…" autocomplete="off" maxlength="20" enterkeyhint="go">
+    <button id="send">说</button>
+  </div>
+  <div class="hint" id="hint"></div>
+
+  <div class="result" id="result"></div>
+
+  <p class="foot">你和「对方」各说一个词。你猜中它想的那个词 = 同频。<br>猜错要先完成一个惩罚，才有下一次机会。<br>随便说，它没听懂的词不算次数。</p>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="ov-card">
+    <div class="ov-kicker" id="ovKicker">惩罚</div>
+    <h3 id="ovName">—</h3>
+    <p id="ovDesc">—</p>
+    <div id="stage"></div>
+    <div class="timerBar"><i id="bar"></i></div>
+    <div class="pgNote" id="ovNote"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- 可选：用 tools/build-extra.js 生成的扩展词库（联网抓来的同类词） -->
+<script src="extra-words.js" onerror="void 0"></script>
+
+<script>
+/* =====================================================================
+   词库：三层
+   1. words  —— 它可能想到的词（带标签，用来给冷热反馈）
+   2. family —— 这一类里几乎所有说得出口的词（用来听懂“同类”）
+   3. ALIAS  —— 别称（凤梨=菠萝）
+   三层之外 = 它没听懂，不计次、不惩罚
+   ===================================================================== */
+const W = s => { const [w,...tags]=s.split("|"); return {w, tags}; };
+const F = s => s.split(",");
+
+const PROMPTS = [
+  {
+    id:"fruit", label:"水果", kind:"水果", q:"说一个水果",
+    words:[
+      W("苹果|红|甜|脆|温带|圆"), W("香蕉|黄|甜|软|热带|长"),
+      W("橙子|橙|酸甜|多汁|温带|圆"), W("葡萄|紫|甜|多汁|温带|小"),
+      W("西瓜|绿|甜|多汁|热带|大"), W("草莓|红|酸甜|软|温带|小"),
+      W("芒果|黄|甜|软|热带|中"), W("菠萝|黄|酸甜|多汁|热带|大"),
+      W("梨|黄|甜|脆|温带|中"), W("桃子|红|甜|软|温带|中"),
+      W("樱桃|红|酸甜|软|温带|小"), W("柠檬|黄|酸|多汁|亚热带|小"),
+      W("猕猴桃|绿|酸甜|软|温带|小"), W("榴莲|黄|甜|软|热带|大"),
+      W("荔枝|红|甜|多汁|热带|小"), W("柚子|黄|酸甜|多汁|亚热带|大"),
+      W("哈密瓜|黄|甜|脆|温带|大"), W("火龙果|红|甜|软|热带|中"),
+      W("蓝莓|蓝|酸甜|软|温带|小"), W("石榴|红|酸甜|多汁|温带|中"),
+    ],
+    family:F("苹果,香蕉,橙子,葡萄,西瓜,草莓,芒果,菠萝,梨,桃子,樱桃,柠檬,猕猴桃,榴莲,荔枝,柚子,哈密瓜,火龙果,蓝莓,石榴,橘子,桔子,柑子,脐橙,血橙,青提,红提,巨峰,车厘子,西梅,李子,杏,油桃,黄桃,蟠桃,雪梨,香梨,蜜瓜,甜瓜,香瓜,木瓜,椰子,牛油果,百香果,山竹,红毛丹,龙眼,桂圆,杨桃,莲雾,番石榴,释迦,柿子,枣,山楂,无花果,菠萝蜜,人参果,圣女果,沙棘"),
+  },
+  {
+    id:"animal", label:"动物", kind:"动物", q:"说一种动物",
+    words:[
+      W("狗|哺乳|家养|毛|四足|中"), W("猫|哺乳|家养|毛|四足|小"),
+      W("大象|哺乳|野生|无毛|四足|巨"), W("老虎|哺乳|野生|毛|四足|大"),
+      W("熊猫|哺乳|野生|毛|四足|大"), W("蛇|爬行|野生|鳞|无足|长"),
+      W("鹰|鸟类|野生|羽毛|有翅|中"), W("鲸鱼|哺乳|野生|无毛|水生|巨"),
+      W("鲨鱼|鱼类|野生|鳞|水生|大"), W("兔子|哺乳|家养|毛|四足|小"),
+      W("马|哺乳|家养|毛|四足|大"), W("鸡|鸟类|家养|羽毛|有翅|小"),
+      W("蚂蚁|昆虫|野生|壳|多足|微"), W("狮子|哺乳|野生|毛|四足|大"),
+      W("牛|哺乳|家养|毛|四足|大"), W("猴子|哺乳|野生|毛|四足|中"),
+      W("企鹅|鸟类|野生|羽毛|水生|中"), W("青蛙|两栖|野生|湿|四足|小"),
+      W("蝴蝶|昆虫|野生|翅|有翅|微"), W("乌龟|爬行|野生|壳|四足|小"),
+    ],
+    family:F("狗,猫,大象,老虎,熊猫,蛇,鹰,鲸鱼,鲨鱼,兔子,马,鸡,蚂蚁,狮子,牛,猴子,企鹅,青蛙,蝴蝶,乌龟,羊,猪,驴,骆驼,鹿,狼,狐狸,豹,熊,河马,犀牛,长颈鹿,斑马,袋鼠,考拉,树懒,刺猬,松鼠,老鼠,蝙蝠,海豚,海豹,海狮,鸵鸟,孔雀,鸽子,乌鸦,麻雀,天鹅,鸭子,鹅,火鸡,鹦鹉,猫头鹰,啄木鸟,蜥蜴,鳄鱼,螃蟹,虾,章鱼"),
+  },
+  {
+    id:"job", label:"职业", kind:"职业", q:"说一种职业",
+    words:[
+      W("医生|室内|高学历|救人|固定地点|高薪"), W("老师|室内|高学历|育人|固定地点|稳定"),
+      W("程序员|室内|高学历|写代码|坐班|高薪"), W("厨师|室内|手艺|做饭|固定地点|稳定"),
+      W("警察|室外|公职|执法|流动|稳定"), W("司机|室外|手艺|运输|流动|稳定"),
+      W("护士|室内|高学历|救人|固定地点|稳定"), W("律师|室内|高学历|讲道理|固定地点|高薪"),
+      W("演员|室内|天赋|表演|流动|高薪"), W("农民|室外|手艺|种地|固定地点|低薪"),
+      W("快递员|室外|体力|运输|流动|低薪"), W("设计师|室内|高学历|创作|坐班|中薪"),
+      W("消防员|室外|公职|救人|流动|稳定"), W("歌手|室内|天赋|表演|流动|高薪"),
+      W("工程师|室内|高学历|建造|坐班|高薪"), W("会计|室内|高学历|算账|坐班|稳定"),
+      W("记者|室外|高学历|采访|流动|中薪"), W("导游|室外|手艺|讲解|流动|低薪"),
+      W("飞行员|室外|高学历|驾驶|流动|高薪"), W("兽医|室内|高学历|救治|固定地点|中薪"),
+    ],
+    family:F("医生,老师,程序员,厨师,警察,司机,护士,律师,演员,农民,快递员,设计师,消防员,歌手,工程师,会计,记者,导游,飞行员,兽医,作家,编辑,翻译,画家,音乐家,导演,编剧,摄影师,化妆师,模特,运动员,教练,裁判,军人,法官,公务员,保安,理发师,裁缝,木匠,电工,水管工,焊工,矿工,渔民,宇航员,科学家,药剂师,牙医,心理医生,营养师,调酒师,咖啡师,服务员,保洁员,保姆,销售,客服,人事,主播,主持人,魔术师,小丑"),
+  },
+  {
+    id:"city", label:"城市", kind:"城市", q:"说一个城市",
+    words:[
+      W("北京|北方|一线|内陆|历史|温"), W("上海|南方|一线|沿海|现代|温"),
+      W("广州|南方|一线|沿海|美食|热"), W("深圳|南方|一线|沿海|现代|热"),
+      W("成都|西部|新一线|内陆|美食|温"), W("杭州|南方|新一线|沿海|美食|温"),
+      W("重庆|西部|新一线|内陆|美食|热"), W("西安|北方|新一线|内陆|历史|温"),
+      W("南京|南方|新一线|内陆|历史|温"), W("武汉|南方|新一线|内陆|美食|热"),
+      W("天津|北方|新一线|沿海|美食|温"), W("苏州|南方|新一线|沿海|历史|温"),
+      W("青岛|北方|新一线|沿海|美食|温"), W("厦门|南方|二线|沿海|海岛|热"),
+      W("长沙|南方|新一线|内陆|美食|热"), W("昆明|南方|二线|高原|温|美食"),
+      W("哈尔滨|北方|二线|内陆|历史|冷"), W("三亚|南方|二线|沿海|海岛|热"),
+      W("拉萨|西部|二线|高原|历史|冷"),
+    ],
+    family:F("北京,上海,广州,深圳,成都,杭州,重庆,西安,南京,武汉,天津,苏州,青岛,厦门,长沙,昆明,哈尔滨,三亚,拉萨,香港,澳门,台北,郑州,济南,合肥,福州,南昌,太原,石家庄,沈阳,长春,大连,呼和浩特,乌鲁木齐,兰州,西宁,银川,贵阳,南宁,海口,珠海,东莞,佛山,无锡,宁波,温州,常州,徐州,烟台,洛阳,开封,桂林,丽江,大理,张家界,敦煌,绍兴,扬州,泉州"),
+  },
+  {
+    id:"movie", label:"电影", kind:"电影", q:"说一部电影",
+    words:[
+      W("泰坦尼克号|好莱坞|爱情|90年代|获奖"), W("阿凡达|好莱坞|科幻|00年代|高票房"),
+      W("肖申克的救赎|好莱坞|剧情|90年代|获奖"), W("流浪地球|国产|科幻|10年代|高票房"),
+      W("让子弹飞|国产|喜剧|10年代|获奖"), W("大话西游|国产|喜剧|90年代|系列"),
+      W("千与千寻|日本|动画|00年代|获奖"), W("星际穿越|好莱坞|科幻|10年代|获奖"),
+      W("复仇者联盟|好莱坞|科幻|10年代|系列"), W("教父|好莱坞|犯罪|70年代|获奖"),
+      W("霸王别姬|国产|剧情|90年代|获奖"), W("疯狂动物城|好莱坞|动画|10年代|高票房"),
+      W("你好李焕英|国产|喜剧|10年代|高票房"), W("我不是药神|国产|剧情|10年代|高票房"),
+      W("头号玩家|好莱坞|科幻|10年代|高票房"), W("盗梦空间|好莱坞|科幻|10年代|获奖"),
+      W("哪吒之魔童降世|国产|动画|10年代|高票房"), W("无间道|国产|犯罪|00年代|获奖"),
+    ],
+    family:F("泰坦尼克号,阿凡达,肖申克的救赎,流浪地球,让子弹飞,大话西游,千与千寻,星际穿越,复仇者联盟,教父,霸王别姬,疯狂动物城,你好李焕英,我不是药神,头号玩家,盗梦空间,哪吒之魔童降世,无间道,功夫,少林足球,唐伯虎点秋香,喜剧之王,美人鱼,战狼,红海行动,长津湖,满江红,热辣滚烫,消失的她,孤注一掷,封神,流浪地球2,蜘蛛侠,蝙蝠侠,钢铁侠,变形金刚,哈利波特,指环王,阿甘正传,楚门的世界,这个杀手不太冷,当幸福来敲门,三傻大闹宝莱坞,摔跤吧爸爸,寄生虫,釜山行,你的名字,天气之子,龙猫,天空之城,狮子王,冰雪奇缘,寻梦环游记,飞屋环游记,疯狂原始人,机器人总动员,玩具总动员,黑客帝国,侏罗纪公园,加勒比海盗"),
+  },
+  {
+    id:"food", label:"食物", kind:"食物", q:"说一种食物",
+    words:[
+      W("火锅|中式|辣|正餐|热|聚餐"), W("饺子|中式|咸|主食|热|节日"),
+      W("拉面|中式|咸|主食|热|常见"), W("烧烤|中式|咸|正餐|热|夜宵"),
+      W("汉堡|西式|咸|主食|热|快餐"), W("披萨|西式|咸|主食|热|聚餐"),
+      W("寿司|日式|咸|主食|冷|常见"), W("麻辣烫|中式|辣|正餐|热|常见"),
+      W("炒饭|中式|咸|主食|热|常见"), W("包子|中式|咸|主食|热|早餐"),
+      W("炸鸡|西式|咸|主食|热|快餐"), W("米线|中式|辣|主食|热|常见"),
+      W("煎饼|中式|咸|主食|热|早餐"), W("粥|中式|淡|主食|热|早餐"),
+      W("汤圆|中式|甜|小吃|热|节日"), W("烤鸭|中式|咸|正餐|热|聚餐"),
+      W("麻辣香锅|中式|辣|正餐|热|聚餐"), W("螺蛳粉|中式|辣|主食|热|常见"),
+    ],
+    family:F("火锅,饺子,拉面,烧烤,汉堡,披萨,寿司,麻辣烫,炒饭,包子,炸鸡,米线,煎饼,粥,汤圆,烤鸭,麻辣香锅,螺蛳粉,面条,米饭,馒头,花卷,油条,豆浆,豆腐脑,小笼包,生煎,馄饨,云吞,春卷,粽子,月饼,年糕,蛋炒饭,盖浇饭,咖喱饭,肉夹馍,凉皮,酸辣粉,热干面,肠粉,烧卖,锅贴,水煮鱼,麻婆豆腐,宫保鸡丁,鱼香肉丝,番茄炒蛋,红烧肉,回锅肉,糖醋里脊,小炒肉,地三鲜,沙拉,三明治,薯条,热狗,意面,牛排,咖喱,天妇罗,乌冬面,寿喜锅,部队锅,炸酱面,牛肉面,酸菜鱼,小龙虾,羊肉串,煎饺,春饼,八宝粥"),
+  },
+  {
+    id:"sport", label:"运动", kind:"运动", q:"说一项运动",
+    words:[
+      W("足球|球类|团队|室外|奥运"), W("篮球|球类|团队|室内|奥运"),
+      W("乒乓球|球类|个人|室内|中国强"), W("羽毛球|球类|个人|室内|奥运"),
+      W("网球|球类|个人|室外|奥运"), W("游泳|水上|个人|室内|奥运"),
+      W("跑步|田径|个人|室外|流行"), W("排球|球类|团队|室内|奥运"),
+      W("高尔夫|球类|个人|室外|流行"), W("拳击|格斗|个人|室内|奥运"),
+      W("滑雪|雪地|个人|室外|冬奥"), W("滑板|极限|个人|室外|奥运"),
+      W("自行车|骑行|个人|室外|奥运"), W("瑜伽|健身|个人|室内|流行"),
+      W("登山|户外|个人|室外|流行"), W("举重|力量|个人|室内|奥运"),
+      W("棒球|球类|团队|室外|流行"), W("台球|球类|个人|室内|流行"),
+    ],
+    family:F("足球,篮球,乒乓球,羽毛球,网球,游泳,跑步,排球,高尔夫,拳击,滑雪,滑板,自行车,瑜伽,登山,举重,棒球,台球,跳水,体操,射箭,射击,击剑,柔道,跆拳道,摔跤,马拉松,竞走,跨栏,铁人三项,冲浪,帆船,潜水,攀岩,飞盘,橄榄球,冰球,冰壶,花样滑冰,速度滑冰,越野跑,健身,普拉提,跳绳,踢毽子,太极拳,武术,散打,赛车,电竞,保龄球,壁球,门球,飞镖,马术,赛艇,皮划艇,摩托车,空中跳伞"),
+  },
+  {
+    id:"color", label:"颜色", kind:"颜色", q:"说一种颜色",
+    words:[
+      W("红|暖|明|常见|热情"), W("蓝|冷|中|常见|平静"),
+      W("绿|冷|中|常见|自然"), W("黄|暖|明|常见|活力"),
+      W("白|中性|明|常见|干净"), W("黑|中性|暗|常见|高级"),
+      W("紫|冷|中|少见|神秘"), W("粉|暖|明|常见|温柔"),
+      W("橙|暖|明|常见|活力"), W("灰|中性|暗|常见|沉稳"),
+      W("棕|暖|暗|常见|沉稳"), W("青|冷|中|少见|清冷"),
+      W("金|暖|明|少见|高级"), W("银|中性|明|少见|高级"),
+      W("米|暖|明|常见|温柔"), W("藏青|冷|暗|少见|沉稳"),
+      W("珊瑚|暖|明|少见|温柔"), W("墨绿|冷|暗|少见|神秘"),
+    ],
+    family:F("红,蓝,绿,黄,白,黑,紫,粉,橙,灰,棕,青,金,银,米,藏青,珊瑚,墨绿,大红,朱红,酒红,玫红,桃红,橘红,橙红,浅蓝,深蓝,天蓝,湖蓝,宝蓝,藏蓝,军绿,草绿,翠绿,青绿,黄绿,柠檬黄,鹅黄,土黄,米黄,杏色,卡其,驼色,咖啡色,巧克力色,奶茶色,裸粉,藕粉,香槟色,象牙白,珍珠白,石墨灰,烟灰,炭黑,雾霾蓝,莫兰迪,荧光绿,荧光粉,浅紫,深紫,丁香紫"),
+  },
+  {
+    id:"object", label:"日用品", kind:"日用品", q:"说一件日用品",
+    words:[
+      W("手机|电子|常用|随身|必需品|小"), W("雨伞|杂物|常用|随身|易丢|中"),
+      W("钥匙|杂物|常用|随身|易丢|小"), W("钱包|杂物|常用|随身|易丢|小"),
+      W("眼镜|杂物|常用|随身|必需品|小"), W("水杯|杂物|常用|随身|工具|中"),
+      W("充电器|电子|常用|随身|易丢|小"), W("剪刀|杂物|偶尔|家里|工具|小"),
+      W("台灯|电器|常用|家里|工具|中"), W("枕头|纺织|常用|家里|舒适|大"),
+      W("拖鞋|纺织|常用|家里|舒适|中"), W("毛巾|纺织|常用|家里|舒适|中"),
+      W("牙刷|杂物|常用|家里|必需品|小"), W("梳子|杂物|常用|随身|易丢|小"),
+      W("背包|纺织|常用|随身|工具|中"), W("耳机|电子|常用|随身|易丢|小"),
+      W("手表|电子|偶尔|随身|昂贵|小"), W("笔记本电脑|电子|常用|随身|昂贵|大"),
+    ],
+    family:F("手机,雨伞,钥匙,钱包,眼镜,水杯,充电器,剪刀,台灯,枕头,拖鞋,毛巾,牙刷,梳子,背包,耳机,手表,笔记本电脑,鼠标,键盘,数据线,充电宝,口罩,纸巾,湿巾,镜子,指甲刀,打火机,笔,笔记本,便利贴,胶带,订书机,尺子,橡皮,书包,手提包,行李箱,帽子,围巾,手套,袜子,皮带,香水,护手霜,防晒霜,水壶,饭盒,雨衣,电扇,加湿器,空气炸锅,电饭煲,微波炉,吹风机,卷发棒,剃须刀,洗衣液,洗面奶,牙膏,洗发水"),
+  },
+  {
+    id:"app", label:"手机应用", kind:"应用", q:"说一个手机应用",
+    words:[
+      W("微信|社交|国产|常用|全民|免费"), W("抖音|视频|国产|常用|全民|免费"),
+      W("淘宝|购物|国产|常用|全民|免费"), W("支付宝|工具|国产|常用|全民|免费"),
+      W("微博|社交|国产|常用|全民|免费"), W("小红书|社交|国产|常用|年轻人|免费"),
+      W("B站|视频|国产|常用|年轻人|免费"), W("知乎|社交|国产|偶尔|年轻人|免费"),
+      W("美团|工具|国产|常用|全民|免费"), W("网易云音乐|音乐|国产|常用|年轻人|免费"),
+      W("QQ|社交|国产|偶尔|年轻人|免费"), W("高德地图|工具|国产|常用|全民|免费"),
+      W("拼多多|购物|国产|常用|全民|免费"), W("京东|购物|国产|常用|全民|免费"),
+      W("豆瓣|社交|国产|偶尔|年轻人|免费"), W("王者荣耀|游戏|国产|常用|年轻人|免费"),
+      W("钉钉|工具|国产|常用|上班族|免费"), W("快手|视频|国产|常用|全民|免费"),
+    ],
+    family:F("微信,抖音,淘宝,支付宝,微博,小红书,B站,知乎,美团,网易云音乐,QQ,高德地图,拼多多,京东,豆瓣,王者荣耀,钉钉,快手,QQ音乐,酷狗音乐,优酷,爱奇艺,腾讯视频,芒果TV,百度,百度网盘,夸克,闲鱼,转转,饿了么,大众点评,携程,飞猪,12306,滴滴,哈啰,同花顺,雪球,招商银行,中国移动,学习强国,豆包,通义,DeepSeek,ChatGPT,Instagram,TikTok,YouTube,Twitter,WhatsApp,Telegram,Netflix,Spotify,Steam,原神,和平精英,欢乐斗地主,消消乐,得物,唯品会,超级课程表"),
+  },
+  {
+    id:"transport", label:"交通工具", kind:"交通工具", q:"说一种交通工具",
+    words:[
+      W("自行车|陆|慢|私人|短途|人力"), W("地铁|陆|快|公共|短途|电动"),
+      W("公交车|陆|慢|公共|短途|燃油"), W("出租车|陆|中|公共|中途|燃油"),
+      W("高铁|陆|快|公共|长途|电动"), W("飞机|空|快|公共|长途|燃油"),
+      W("电动车|陆|中|私人|短途|电动"), W("摩托车|陆|快|私人|中途|燃油"),
+      W("轮船|水|慢|公共|长途|燃油"), W("火车|陆|中|公共|长途|电动"),
+      W("卡车|陆|中|私人|长途|燃油"), W("三轮车|陆|慢|私人|短途|人力"),
+      W("滑板车|陆|慢|私人|短途|人力"), W("缆车|空|慢|公共|短途|电动"),
+      W("热气球|空|慢|私人|短途|燃油"), W("直升机|空|快|私人|中途|燃油"),
+      W("共享单车|陆|慢|公共|短途|人力"), W("渡轮|水|慢|公共|短途|燃油"),
+    ],
+    family:F("自行车,地铁,公交车,出租车,高铁,飞机,电动车,摩托车,轮船,火车,卡车,三轮车,滑板车,缆车,热气球,直升机,共享单车,渡轮,货车,面包车,救护车,消防车,警车,校车,大巴,长途汽车,双层巴士,轻轨,有轨电车,磁悬浮,摆渡车,观光车,电瓶车,平衡车,独轮车,雪橇,马车,帆船,游艇,快艇,木船,竹筏,潜水艇,货轮,邮轮,动车,网约车,顺风车,房车,拖车,挖掘机,拖拉机,叉车,垃圾车,洒水车,索道,电梯,扶梯,轮椅,婴儿车"),
+  },
+  {
+    id:"festival", label:"节日", kind:"节日", q:"说一个节日",
+    words:[
+      W("春节|中式|传统|团聚|冬|吃"), W("中秋节|中式|传统|团聚|秋|吃"),
+      W("端午节|中式|传统|团聚|夏|吃"), W("元宵节|中式|传统|团聚|冬|吃"),
+      W("清明节|中式|传统|祭祖|春|出行"), W("国庆节|中式|现代|放假|秋|出行"),
+      W("元旦|中式|现代|放假|冬|玩乐"), W("圣诞节|西式|现代|送礼|冬|玩乐"),
+      W("情人节|西式|现代|情侣|春|送礼"), W("万圣节|西式|现代|装扮|秋|玩乐"),
+      W("感恩节|西式|传统|团聚|秋|吃"), W("劳动节|中式|现代|放假|春|出行"),
+      W("儿童节|中式|现代|送礼|夏|玩乐"), W("母亲节|西式|现代|感恩|春|送礼"),
+      W("教师节|中式|现代|尊师|秋|送礼"), W("重阳节|中式|传统|敬老|秋|出行"),
+      W("七夕|中式|传统|情侣|秋|送礼"), W("复活节|西式|传统|玩乐|春|彩蛋"),
+    ],
+    family:F("春节,中秋节,端午节,元宵节,清明节,国庆节,元旦,圣诞节,情人节,万圣节,感恩节,劳动节,儿童节,母亲节,教师节,重阳节,七夕,复活节,除夕,小年,龙抬头,寒食节,中元节,腊八节,平安夜,愚人节,父亲节,妇女节,青年节,建军节,建党节,护士节,记者节,植树节,地球日,世界读书日,白色情人节,双十一,618,黑色星期五,冬至,夏至,立春,腊八,扫墓节"),
+  },
+];
+
+/* 可选扩展词库：由 tools/build-extra.js 从网上抓取的同类词，只扩充 family（听得懂），
+   不会成为答案，也不会打乱已有词条。文件不存在时这段什么也不做。 */
+try{
+  if(typeof window!=="undefined" && window.EXTRA_FAMILY){
+    PROMPTS.forEach(p=>{
+      const add=window.EXTRA_FAMILY[p.id]||[];
+      add.forEach(w=>{
+        const x=String(w).trim();
+        if(x && x.length<=6 && !p.family.includes(x)) p.family.push(x);
+      });
+    });
+  }
+}catch(e){}
+
+const ALIAS = {
+  "桔子":"橙子", "橘子":"橙子", "柑子":"橙子", "甜橙":"橙子", "脐橙":"橙子",
+  "凤梨":"菠萝", "车厘子":"樱桃", "奇异果":"猕猴桃", "提子":"葡萄", "青提":"葡萄", "红提":"葡萄",
+  "马铃薯":"土豆", "汪":"狗", "喵":"猫", "猫猫":"猫", "狗狗":"狗",
+  "程序猿":"程序员", "码农":"程序员", "大夫":"医生", "教师":"老师",
+  "快递小哥":"快递员", "桂圆":"龙眼", "西红柿":"番茄",
+  // 跨题材的常见别称
+  "过年":"春节", "年三十":"除夕",
+  "单车":"自行车", "脚踏车":"自行车", "打的":"出租车",
+  "红色":"红", "蓝色":"蓝", "绿色":"绿", "黄色":"黄", "白色":"白",
+  "黑色":"黑", "紫色":"紫", "粉色":"粉", "灰色":"灰", "棕色":"棕",
+  "橙色":"橙", "金色":"金", "银色":"银",
+  "泰坦尼克":"泰坦尼克号", "药神":"我不是药神", "哪吒":"哪吒之魔童降世",
+  "魔都":"上海", "帝都":"北京", "蓉城":"成都", "羊城":"广州", "鹏城":"深圳",
+  "山城":"重庆", "春城":"昆明",
+  "wechat":"微信", "douyin":"抖音", "bilibili":"B站", "taobao":"淘宝",
+};
+const KEY = "same-freq.v1";
+const MAX_TRIES = 4;
+
+/* ---------------- 工具 ---------------- */
+function hashStr(s){ let h=2166136261; for(let i=0;i<s.length;i++){ h^=s.charCodeAt(i); h=Math.imul(h,16777619);} return h>>>0; }
+function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a);
+  t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+function todayUTC(){ return new Date().toISOString().slice(0,10); }
+function norm(s){
+  return String(s).trim().toLowerCase()
+    .replace(/[\s，。！？、,.!?~～…·"'“”‘’()（）\[\]【】:：;；\-—_]/g,"")
+    .replace(/[吗呢吧啊呀哈嘛哦]+$/g,"");
+}
+const $=s=>document.querySelector(s);
+
+let state={days:{}, practice:0};
+try{ const raw=localStorage.getItem(KEY); if(raw) state=Object.assign(state,JSON.parse(raw)); }catch(e){}
+state.days=state.days||{};
+
+/* ---------------- 出题 ---------------- */
+/* 每天的题材按天轮转：12 个题材，12 天一轮，不会连着两天撞题材 */
+function dayIndex(seedStr){
+  const ms = Date.parse(String(seedStr).slice(0,10) + "T00:00:00Z");
+  return isNaN(ms) ? 0 : Math.floor(ms / 86400000);
+}
+function pickPrompt(seedStr){
+  // 练习种子形如 2026-11-19-p3：从今天的题材往后轮，每次换一个
+  const pm = /^(\d{4}-\d{2}-\d{2})-p(\d+)$/.exec(String(seedStr));
+  const base = dayIndex(pm ? pm[1] : seedStr) + (pm ? Number(pm[2]) : 0);
+  const i = ((base % PROMPTS.length) + PROMPTS.length) % PROMPTS.length;
+  return PROMPTS[i];
+}
+function pickAnswer(prompt, seedStr){
+  const rnd=mulberry32(hashStr("sf-answer-"+seedStr));
+  return prompt.words[Math.floor(rnd()*prompt.words.length)];
+}
+/* 一次出题 = 题目 + 隐藏答案 + 日期种子 */
+function makeRound(seedStr){
+  const prompt=pickPrompt(seedStr);
+  const answer=pickAnswer(prompt, seedStr+"-"+prompt.id);
+  return {prompt, answer, seed:seedStr};
+}
+
+/* ---------------- 判定 ----------------
+   同频 = 完全一样（含别称）
+   在它的候选里 = 比标签重合度，给冷热
+   不在候选但在这一类的词库里 = 同类（它听懂了，只是想的不是这个）
+   在别的题目的词库里 = 类型不对
+   三层之外 = 没听懂，不计次
+   ---------------------------------------------------------------- */
+function judge(guessRaw, answer, prompt){
+  const g=ALIAS[norm(guessRaw)] || norm(guessRaw);
+  if(g===norm(answer.w)) return {type:"exact", shared:answer.tags.slice(), guess:g};
+
+  const entry=prompt.words.find(x=>norm(x.w)===g);
+  if(entry){
+    const hit=entry.tags.filter(t=>answer.tags.includes(t));
+    return {type: hit.length>=2?"warm":hit.length===1?"near":"cold", shared:hit, guess:g};
+  }
+  if(prompt.family.some(w=>norm(w)===g)) return {type:"kin", shared:[], guess:g};
+  const inOther=PROMPTS.some(p=>p!==prompt &&
+    (p.family.some(w=>norm(w)===g) || p.words.some(x=>norm(x.w)===g)));
+  if(inOther) return {type:"wrong", shared:[], guess:g};
+  return {type:"unknown", shared:[], guess:g};
+}
+
+/* ---------------- 界面 ---------------- */
+let round=null, tries=[], done=false, won=false, practice=false, timerId=0;
+
+function renderHead(){
+  const d=state.days[todayUTC()];
+  $("#streak").textContent=(d&&d.streak)||0;
+}
+function renderRows(){
+  const kind=round?round.prompt.kind:"";
+  const map={ exact:["g","同频"], warm:["y","很接近"], near:["y","沾边"],
+              cold:["b","不像"], kin:["k","同类，但不是它"], wrong:["b","不是这一类"] };
+  $("#rows").innerHTML=tries.map(t=>{
+    const [mk,label]=map[t.type]||["b","不像"];
+    const shared=t.shared||[];   // 旧版本存档没有 shared 字段
+    const sub = shared.length ? "共同："+shared.join(" · ")
+              : t.type==="kin"    ? `确实是${kind}，但它想的不是这个`
+              : t.type==="wrong"  ? `这不是${kind}`
+              : "维度全不同";
+    return `<div class="row answered">
+      <div style="flex:1"><div class="w">${t.guess||"—"}</div>
+        <div class="tags">${sub}</div></div>
+      <div class="mk ${mk}">${label}</div></div>`;
+  }).join("");
+}
+function renderHint(){
+  const left=MAX_TRIES-tries.length;
+  if(done) { $("#hint").textContent=""; return; }
+  $("#hint").innerHTML = left>0
+    ? `还剩 <b>${left}</b> 次机会 · 它想的是最常见的说法`
+    : "";
+}
+
+/* ---------------- 主流程 ---------------- */
+function newRound(seed, isPractice){
+  practice=!!isPractice;
+  round=makeRound(seed);
+  tries=[]; done=false; won=false;
+  $("#qText").textContent=round.prompt.q;
+  $("#qLabel").textContent=(isPractice?"练习题目":"今天的问题是")+" · "+round.prompt.label;
+  $("#qMeta").textContent=isPractice?"练习模式不记连胜":"每天一题 · 全球同一个答案 · 题材每天轮换";
+  $("#guess").value=""; $("#guess").disabled=false; $("#send").disabled=false;
+  $("#result").classList.remove("show"); $("#result").innerHTML="";
+  renderRows(); renderHint(); renderHead();
+  setTimeout(()=>$("#guess").focus(), 60);
+}
+
+function submitGuess(){
+  if(done) return;
+  const raw=$("#guess").value;
+  if(!norm(raw)) return;
+  const r=judge(raw, round.answer, round.prompt);
+  // 它没听懂：不计次、不惩罚，让玩家改个说法
+  if(r.type==="unknown"){
+    toast(`它没听懂「${r.guess}」· 这次不算，换个名词说法再试`);
+    try{ $("#guess").select(); }catch(e){}
+    return;
+  }
+  // 同一个词不重复计入
+  if(tries.some(t=>t.guess===r.guess)){ toast("这个词说过了"); return; }
+  tries.push(r);
+  $("#guess").value="";
+  renderRows();
+
+  if(r.type==="exact"){ finish(true); return; }
+  if(tries.length>=MAX_TRIES){ finish(false); return; }
+  // 不同频 → 先跑完一个惩罚
+  startPunishment();
+}
+
+function finish(win){
+  done=true; won=win;
+  $("#guess").disabled=true; $("#send").disabled=true;
+  const used=tries.length;
+  const score = win ? Math.max(40, 100-(used-1)*20) : 0;
+  const day=todayUTC();
+  const d=state.days[day]||(state.days[day]={});
+  if(!practice){
+    if(win){
+      const prev=d.date;
+      const y=new Date(Date.now()-864e5).toISOString().slice(0,10);
+      d.streak = prev===y ? (d.streak||0)+1 : (prev===day ? (d.streak||1) : 1);
+      d.date=day; d.win=true; d.tries=used;
+    } else {
+      d.date=day; d.win=false; d.tries=used; d.streak=0;
+    }
+    d.score=score;
+    d.guesses=tries.map(t=>({guess:t.guess, type:t.type, shared:t.shared}));
+    try{ localStorage.setItem(KEY, JSON.stringify(state)); }catch(e){}
+  }
+  renderResult(win, score);
+  renderHint(); renderHead();
+}
+
+function renderResult(win, score){
+  const used=tries.length;
+  const day=todayUTC();
+  const el=$("#result");
+  el.innerHTML=`
+    <h2>${win?"🟩 同频了":"⬛ 没对上"}</h2>
+    <div class="big ${win?"win":"lose"}">${win?score:0} 分 · 连胜 ${(state.days[day]&&state.days[day].streak)||0} 天</div>
+    <p>对方想的是 <b style="color:var(--txt)">${round.answer.w}</b>
+      （${round.answer.tags.join(" · ")}）${win?"，你在第 "+used+" 次说中了。":"你说了 "+tries.map(t=>t.guess).join("、")+"。"}</p>
+    <div class="btns">
+      <button class="primary" id="shareBtn">复制结果</button>
+      <button id="againBtn">换一题练手</button>
+    </div>`;
+  el.classList.add("show");
+  $("#shareBtn").addEventListener("click", share);
+  $("#againBtn").addEventListener("click", startPractice);
+}
+
+/* 当天已玩过：复原结果，不允许当天重玩 */
+function restore(d){
+  done=true; won=!!d.win;
+  tries=(d.guesses||[]).slice();
+  $("#guess").disabled=true; $("#send").disabled=true;
+  renderRows();
+  renderResult(won, d.score||0);
+  renderHint(); renderHead();
+}
+
+function share(){
+  const grid=tries.map(t=>t.type==="exact"?"🟩":(t.type==="warm"||t.type==="near")?"🟨":t.type==="kin"?"🟦":"⬛").join("");
+  const d=state.days[todayUTC()]||{};
+  const text=`同频 ${todayUTC()} 「${round.prompt.q}」\n${grid} ${won?tries.length+"次说中":"没对上"}\n连胜 ${d.streak||0} 天\n${location.href}`;
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(()=>toast("已复制")).catch(()=>toast("复制失败"));
+  } else {
+    const ta=document.createElement("textarea"); ta.value=text; document.body.appendChild(ta);
+    ta.select(); document.execCommand("copy"); ta.remove(); toast("已复制");
+  }
+}
+
+/* =====================================================================
+   惩罚引擎：15 种
+   tier 1/2/3 对应第 1/2/3 次猜错；同日同次失误，所有人抽到同一种
+   ===================================================================== */
+function mix(arr, rnd){
+  const a=arr.slice();
+  for(let i=a.length-1;i>0;i--){ const j=Math.floor(rnd()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; }
+  return a;
+}
+const SILLY_LINES=[
+  "我明天一定会和你同频，这句话我已经说了三次。",
+  "刚才那个词，其实是我家猫的外号。",
+  "我承认，我一直在瞎猜。",
+  "这个惩罚，比我上个月的工作还累。",
+  "跑完这 200 米，我们还是朋友吗？",
+];
+const MEM_WORDS=["西瓜","火车","月亮","袜子","冰箱","恐龙","雪糕","键盘","鲸鱼","蜡烛","鸽子","枕头","雨伞","蘑菇","车牌"];
+
+const PUNISH=[
+  /* ---- tier 1 ---- */
+  { id:"tap", tier:1, sec:8, name:"连点 20 下", desc:"8 秒内点满 20 下。跑起来别停。",
+    build(stage, api){
+      stage.innerHTML='<button class="pgBig">点</button><div class="pgNum"><b>0</b> / 20</div>';
+      const b=stage.querySelector(".pgBig"), n=stage.querySelector(".pgNum b");
+      let c=0;
+      b.addEventListener("click", ()=>{ c++; n.textContent=c; if(c>=20) api.pass(); });
+    } },
+  { id:"hold", tier:1, sec:10, name:"撑住 6 秒", desc:"按住不要松手。松了就从头算。",
+    build(stage, api){
+      stage.innerHTML='<button class="pgBig">按住</button><div class="pgProg"><i></i></div>';
+      const b=stage.querySelector(".pgBig"), bar=stage.querySelector(".pgProg i");
+      let t=0, iv=null;
+      const reset=()=>{ clearInterval(iv); iv=null; t=0; bar.style.width="0%"; };
+      b.addEventListener("pointerdown", e=>{ e.preventDefault(); if(iv) return;
+        iv=setInterval(()=>{ t+=100; bar.style.width=(t/6000*100)+"%";
+          if(t>=6000){ clearInterval(iv); iv=null; api.pass(); } },100); });
+      b.addEventListener("pointerup", ()=>{ if(iv&&t<6000) reset(); });
+      b.addEventListener("pointercancel", ()=>{ if(iv&&t<6000) reset(); });
+    } },
+  { id:"rps", tier:1, sec:14, name:"石头剪刀布", desc:"对方已经出了。赢一次就放你走。",
+    build(stage, api, rnd){
+      const names=["石头","剪刀","布"], ai=Math.floor(rnd()*3);
+      stage.innerHTML='<div class="pgWord" style="font-size:16px">你出什么？</div><div class="pgRow"></div><div class="pgNote"></div>';
+      const row=stage.querySelector(".pgRow"), note=stage.querySelector(".pgNote");
+      names.forEach((nm, me)=>{ const b=document.createElement("button"); b.className="pgOpt"; b.textContent=nm;
+        b.addEventListener("click", ()=>{
+          if(me===ai){ note.textContent=`对方也是「${names[ai]}」，平局再来`; return; }
+          const meWin=(me-ai+3)%3===2;
+          note.textContent=`对方出的是「${names[ai]}」`;
+          if(meWin) api.pass(); else api.fail("猜拳输了");
+        });
+        row.appendChild(b); });
+    } },
+  { id:"odd", tier:1, sec:14, name:"找出不一样的那个", desc:"16 个里只有一个不同。点它。",
+    build(stage, api, rnd){
+      const pairs=[["🍎","🍏"],["🐟","🐠"],["🌕","🌑"],["🍋","🍊"],["🐶","🐺"],["⭐","🌟"],["🍄","🌰"]];
+      const pr=pairs[Math.floor(rnd()*pairs.length)], k=Math.floor(rnd()*16);
+      stage.innerHTML='<div class="pgGrid" style="grid-template-columns:repeat(4,1fr)"></div><div class="pgNote">慢慢找，别急</div>';
+      const g=stage.querySelector(".pgGrid"), note=stage.querySelector(".pgNote");
+      for(let i=0;i<16;i++){
+        const b=document.createElement("button"); b.className="pgCell"; b.textContent = i===k ? pr[1] : pr[0];
+        b.addEventListener("click", ()=>{ if(i===k) api.pass(); else note.textContent="不是这个，再看"; });
+        g.appendChild(b);
+      }
+    } },
+  { id:"face", tier:1, sec:0, name:"做个鬼脸", desc:"对着屏幕做一个鬼脸。做完点下面。",
+    build(stage, api){
+      stage.innerHTML='<button class="pgBig" disabled style="opacity:.35">我做了</button><div class="pgNote">3 秒后才能点</div>';
+      const b=stage.querySelector(".pgBig"), note=stage.querySelector(".pgNote");
+      later(()=>{ b.disabled=false; b.style.opacity=1; note.textContent="现在可以点了"; }, 3000);
+      b.addEventListener("click", ()=>api.pass());
+    } },
+
+  /* ---- tier 2 ---- */
+  { id:"balance", tier:2, sec:12, name:"稳住别抖", desc:"把滑块拖进中间，连续保持 2.5 秒。",
+    build(stage, api){
+      stage.innerHTML='<input type="range" min="0" max="100" value="0" class="pgRange"><div class="pgProg"><i></i></div><div class="pgNote">只在中间区域计时</div>';
+      const s=stage.querySelector("input"), bar=stage.querySelector(".pgProg i"), note=stage.querySelector(".pgNote");
+      let held=0;
+      every(()=>{
+        const v=+s.value;
+        if(v>=42 && v<=58){ held+=100; bar.style.width=Math.min(100, held/2500*100)+"%";
+          note.textContent="保持… "+(held/1000).toFixed(1)+"s";
+          if(held>=2500) api.pass(); }
+        else if(held>0){ held=0; bar.style.width="0%"; note.textContent="跑了，重来"; }
+      },100);
+    } },
+  { id:"drag", tier:2, sec:16, name:"把小蓝点拖进圈里", desc:"按住蓝点，拖进虚线圆圈后松手。",
+    build(stage, api){
+      stage.innerHTML='<div class="pgDrag"><div class="pgTarget"></div><div class="pgDot"></div></div><div class="pgNote"></div>';
+      const pad=stage.querySelector(".pgDrag"), dot=stage.querySelector(".pgDot"),
+            tg=stage.querySelector(".pgTarget"), note=stage.querySelector(".pgNote");
+      let drag=false, ox=0, oy=0, x=18, y=18;
+      const inside=()=>{
+        const pr=pad.getBoundingClientRect(), tr=tg.getBoundingClientRect();
+        const cx=pr.left+x+14, cy=pr.top+y+14;
+        return cx>tr.left+6 && cx<tr.right-6 && cy>tr.top+6 && cy<tr.bottom-6;
+      };
+      dot.addEventListener("pointerdown", e=>{ drag=true; dot.setPointerCapture(e.pointerId);
+        const r=dot.getBoundingClientRect(); ox=e.clientX-r.left; oy=e.clientY-r.top; });
+      dot.addEventListener("pointermove", e=>{ if(!drag) return;
+        const pr=pad.getBoundingClientRect();
+        x=Math.max(0, Math.min(pr.width-28, e.clientX-pr.left-ox));
+        y=Math.max(0, Math.min(pr.height-28, e.clientY-pr.top-oy));
+        dot.style.left=x+"px"; dot.style.top=y+"px";
+        tg.style.borderColor = inside() ? "var(--ok)" : "#4a6b8a"; });
+      dot.addEventListener("pointerup", ()=>{ drag=false;
+        if(inside()) api.pass(); else note.textContent="没进圈，再试一次"; });
+    } },
+  { id:"swipe", tier:2, sec:16, name:"来回划 8 次", desc:"左右快速划动，方向必须交替。",
+    build(stage, api){
+      stage.innerHTML='<div class="pgPad"><div class="pgHint">左右划</div></div><div class="pgNum"><b>0</b> / 8</div>';
+      const pad=stage.querySelector(".pgPad"), hint=pad.querySelector(".pgHint"), n=stage.querySelector(".pgNum b");
+      let sx=0, dir=0, c=0;
+      pad.addEventListener("pointerdown", e=>{ sx=e.clientX; });
+      pad.addEventListener("pointerup", e=>{
+        const dx=e.clientX-sx;
+        if(Math.abs(dx)<50) return;
+        const d=dx>0?1:-1;
+        if(dir && d===dir){ hint.textContent="换个方向"; return; }
+        dir=d; c++; n.textContent=c; hint.textContent=d>0?"向右":"向左";
+        if(c>=8) api.pass();
+      });
+    } },
+  { id:"memory", tier:2, sec:16, name:"记住这三个词", desc:"看 1.4 秒，然后选出刚才出现过的那个。",
+    build(stage, api, rnd){
+      const shown=mix(MEM_WORDS, rnd).slice(0,3);
+      const others=mix(MEM_WORDS.filter(w=>!shown.includes(w)), rnd).slice(0,3);
+      const opts=mix(shown.concat(others), rnd);
+      stage.innerHTML=`<div class="pgWord">${shown.join(" · ")}</div><div class="pgNote">记住它们</div>`;
+      later(()=>{
+        stage.innerHTML='<div class="pgWord" style="font-size:16px">哪个出现过？</div><div class="pgRow"></div><div class="pgNote"></div>';
+        const row=stage.querySelector(".pgRow"), note=stage.querySelector(".pgNote");
+        opts.forEach(w=>{ const b=document.createElement("button"); b.className="pgOpt"; b.textContent=w;
+          b.addEventListener("click", ()=>{ if(shown.includes(w)) api.pass(); else { note.textContent=`「${w}」没出现过`; api.fail("没记住"); } });
+          row.appendChild(b); });
+      }, 1400);
+    } },
+  { id:"count", tier:2, sec:16, name:"数红点", desc:"红点只闪一下，然后告诉我几个。",
+    build(stage, api, rnd){
+      const n=3+Math.floor(rnd()*4);
+      const on=mix([...Array(12).keys()], rnd).slice(0,n);
+      stage.innerHTML='<div class="pgGrid" style="grid-template-columns:repeat(4,1fr)"></div><div class="pgNote">看好了</div>';
+      const g=stage.querySelector(".pgGrid");
+      for(let i=0;i<12;i++){
+        const d=document.createElement("div"); d.className="pgCell";
+        if(on.includes(i)){ d.style.background="#e2445c"; d.style.borderColor="#e2445c"; }
+        g.appendChild(d);
+      }
+      later(()=>{
+        stage.innerHTML='<div class="pgWord" style="font-size:16px">刚才有几个红点？</div><div class="pgRow"></div><div class="pgNote"></div>';
+        const row=stage.querySelector(".pgRow"), note=stage.querySelector(".pgNote");
+        [2,3,4,5,6,7].forEach(v=>{ const b=document.createElement("button"); b.className="pgOpt"; b.textContent=v;
+          b.addEventListener("click", ()=>{ if(v===n) api.pass(); else { note.textContent=`其实是 ${n} 个`; api.fail("数错了"); } });
+          row.appendChild(b); });
+      }, 1300);
+    } },
+
+  /* ---- tier 3 ---- */
+  { id:"circle", tier:3, sec:18, name:"顺时针画两圈", desc:"按住框内，顺时针画满两整圈。",
+    build(stage, api){
+      stage.innerHTML='<div class="pgPad"><div class="pgHint">按住画圈</div></div><div class="pgProg"><i></i></div>';
+      const pad=stage.querySelector(".pgPad"), bar=stage.querySelector(".pgProg i");
+      let last=null, acc=0;
+      pad.addEventListener("pointerdown", e=>{ pad.setPointerCapture(e.pointerId); last=null; });
+      pad.addEventListener("pointermove", e=>{
+        const r=pad.getBoundingClientRect(), cx=r.left+r.width/2, cy=r.top+r.height/2;
+        const a=Math.atan2(e.clientY-cy, e.clientX-cx);
+        if(last!==null){
+          let d=a-last;
+          while(d>Math.PI) d-=2*Math.PI;
+          while(d<-Math.PI) d+=2*Math.PI;
+          if(d>0) acc+=d;
+        }
+        last=a;
+        bar.style.width=Math.min(100, acc/(4*Math.PI)*100)+"%";
+        if(acc>=4*Math.PI) api.pass();
+      });
+      pad.addEventListener("pointerup", ()=>{ last=null; });
+    } },
+  { id:"stroop", tier:3, sec:16, name:"反着来", desc:"显示「左」你点右，显示「右」你点左。三轮。",
+    build(stage, api, rnd){
+      let k=0;
+      const round=()=>{
+        const s=rnd()<0.5?"左":"右";
+        stage.innerHTML=`<div class="pgWord">${s}</div><div class="pgRow"><button class="pgOpt" data-s="左">左</button><button class="pgOpt" data-s="右">右</button></div><div class="pgNote">第 ${k+1} / 3 轮</div>`;
+        stage.querySelectorAll(".pgOpt").forEach(b=>b.addEventListener("click", ()=>{
+          if(b.dataset.s!==s){ k++; if(k>=3) api.pass(); else round(); }
+          else api.fail("顺着来了");
+        }));
+      };
+      round();
+    } },
+  { id:"order", tier:3, sec:14, name:"按顺序点", desc:"依次点 1、2、3、4。位置是打乱的。",
+    build(stage, api, rnd){
+      const pos=mix([1,2,3,4], rnd);
+      let next=1;
+      stage.innerHTML='<div class="pgGrid" style="grid-template-columns:repeat(2,1fr)"></div><div class="pgNote">下一个：1</div>';
+      const g=stage.querySelector(".pgGrid"), note=stage.querySelector(".pgNote");
+      pos.forEach(v=>{ const b=document.createElement("button"); b.className="pgCell"; b.style.fontSize="26px"; b.textContent=v;
+        b.addEventListener("click", ()=>{
+          if(v===next){ next++; note.textContent = next>4 ? "完成" : `下一个：${next}`; if(next>4) api.pass(); }
+          else api.fail("顺序错了");
+        });
+        g.appendChild(b); });
+    } },
+  { id:"chase", tier:3, sec:18, name:"抓住会跑的真话", desc:"三个按钮里只有一个写着「真」，它会不停换位置。抓住两次。",
+    build(stage, api, rnd){
+      let hits=0, spot=Math.floor(rnd()*3);
+      stage.innerHTML='<div class="pgRow" style="padding:10px 0"></div><div class="pgNote">第 1 / 2 次</div>';
+      const row=stage.querySelector(".pgRow"), note=stage.querySelector(".pgNote");
+      const draw=()=>{
+        row.innerHTML="";
+        for(let i=0;i<3;i++){
+          const b=document.createElement("button"); b.className="pgOpt"; b.textContent = i===spot ? "真" : "假";
+          b.addEventListener("click", ()=>{
+            if(i!==spot){ api.fail("抓错一个"); return; }
+            hits++;
+            if(hits>=2) api.pass();
+            else { spot=Math.floor(rnd()*3); note.textContent=`第 ${hits+1} / 2 次`; draw(); }
+          });
+          row.appendChild(b);
+        }
+      };
+      draw();
+      every(()=>{ spot=Math.floor(rnd()*3); draw(); }, 950);
+    } },
+  { id:"laugh", tier:3, sec:20, name:"憋笑 5 秒", desc:"按住按钮，读出下面这句话，不许笑。",
+    build(stage, api, rnd){
+      const line=SILLY_LINES[Math.floor(rnd()*SILLY_LINES.length)];
+      stage.innerHTML=`<div class="pgNote" style="font-size:13px;color:#c9d6e4;margin-bottom:12px">「${line}」</div>
+        <button class="pgBig" style="width:112px;height:112px;font-size:16px">按住</button><div class="pgProg"><i></i></div>`;
+      const b=stage.querySelector(".pgBig"), bar=stage.querySelector(".pgProg i");
+      let t=0, iv=null;
+      b.addEventListener("pointerdown", e=>{ e.preventDefault(); if(iv) return;
+        iv=setInterval(()=>{ t+=100; bar.style.width=(t/5000*100)+"%";
+          if(t>=5000){ clearInterval(iv); iv=null; api.pass(); } },100); });
+      b.addEventListener("pointerup", ()=>{ if(iv&&t<5000){ clearInterval(iv); iv=null; t=0; bar.style.width="0%"; } });
+      b.addEventListener("pointercancel", ()=>{ if(iv&&t<5000){ clearInterval(iv); iv=null; t=0; bar.style.width="0%"; } });
+    } },
+];
+
+let P={on:false, done:false, timers:[], why:""};
+function later(fn,ms){ const id=setTimeout(fn,ms); P.timers.push(["t",id]); return id; }
+function every(fn,ms){ const id=setInterval(fn,ms); P.timers.push(["i",id]); return id; }
+function clearAll(){
+  P.timers.forEach(t=> t[0]==="t" ? clearTimeout(t[1]) : clearInterval(t[1]));
+  P.timers=[];
+}
+
+function pickPunish(dateStr, promptId, attempt){
+  const rnd=mulberry32(hashStr("punish-"+dateStr+"|"+promptId+"|"+attempt));
+  const bucket=PUNISH.filter(p=>p.tier===attempt);
+  return bucket[Math.floor(rnd()*bucket.length)];
+}
+
+function startPunishment(){
+  clearAll(); P.on=true; P.done=false; P.why="";
+  try{ $("#guess").blur(); }catch(e){}
+  const attempt=Math.min(tries.length,3);
+  const rnd=mulberry32(hashStr("punish-"+todayUTC()+"|"+round.prompt.id+"|"+attempt));
+  const p=pickPunish(todayUTC(), round.prompt.id, attempt);
+
+  $("#ovKicker").textContent=`第 ${attempt} 次跑 · TIER ${attempt}`;
+  $("#ovName").textContent="命运抽签…";
+  $("#ovDesc").textContent="看看这次抽到什么。";
+  $("#stage").innerHTML="";
+  $("#ovNote").textContent="";
+  $("#bar").style.width="100%";
+  $("#overlay").classList.add("show");
+
+  let k=0;
+  const spin=every(()=>{
+    $("#ovName").textContent=PUNISH[Math.floor(rnd()*PUNISH.length)].name;
+    if(++k>7){ clearInterval(spin); beginPunish(p); }
+  }, 95);
+}
+
+function beginPunish(p){
+  $("#ovName").textContent=p.name;
+  $("#ovDesc").textContent=p.desc;
+  const stage=$("#stage"); stage.innerHTML="";
+  const api={
+    pass(){ if(!P.on||P.done) return; P.done=true; endPunish(true); },
+    fail(why){ if(!P.on||P.done) return; P.done=true; P.why=why||""; endPunish(false); },
+    note(t){ $("#ovNote").textContent=t; }
+  };
+  try{
+    p.build(stage, api, mulberry32(hashStr("px-"+todayUTC()+"-"+p.id)));
+  }catch(e){ api.fail("这个惩罚出了点问题"); return; }
+
+  if(p.sec>0){
+    const t0=Date.now();
+    every(()=>{
+      const left=Math.max(0, p.sec*1000-(Date.now()-t0));
+      $("#bar").style.width=(left/(p.sec*1000)*100)+"%";
+      if(left<=0) api.fail("超时");
+    }, 80);
+  }
+}
+
+function endPunish(pass){
+  P.on=false;
+  clearAll();
+  $("#overlay").classList.remove("show");
+  if(pass){
+    toast(["跑完了，可以再猜","过了，说吧","行，你跑完了"][Math.floor(Math.random()*3)]);
+    $("#guess").focus();
+  } else {
+    toast((P.why ? P.why+"，" : "") + "今天到此为止");
+    finish(false);
+  }
+}
+
+/* ---------------- 练习模式 ---------------- */
+function startPractice(){
+  state.practice=(state.practice||0)+1;
+  newRound(todayUTC()+"-p"+state.practice, true);
+  $("#practiceBtn").textContent="回到今日";
+}
+function goToday(){
+  const day=todayUTC();
+  newRound(day, false);
+  const d=state.days[day];
+  if(d && d.date===day && Array.isArray(d.guesses) && d.guesses.length) restore(d);
+  $("#practiceBtn").textContent="练手";
+}
+
+/* ---------------- 事件 ---------------- */
+$("#practiceBtn").addEventListener("click", ()=>{ practice ? goToday() : startPractice(); });
+$("#send").addEventListener("click", submitGuess);
+$("#guess").addEventListener("keydown", e=>{ if(e.key==="Enter") submitGuess(); });
+
+let toastId=0;
+function toast(msg){
+  const t=$("#toast"); t.textContent=msg; t.classList.add("show");
+  clearTimeout(toastId); toastId=setTimeout(()=>t.classList.remove("show"),1500);
+}
+
+/* ---------------- 启动 ---------------- */
+(function boot(){
+  const day=todayUTC();
+  const d=state.days[day];
+  newRound(day, false);
+  if(d && d.date===day && Array.isArray(d.guesses) && d.guesses.length){
+    restore(d);
+    toast(d.win?"今天已经同频过了，明天再来":"今天已经结束了，明天再来");
+  }
+})();
+</script>
+</body>
+</html>
